@@ -1,5 +1,5 @@
-//mod lexer;
-//use lexer::Lexer;
+mod lexer;
+use lexer::Lexer;
 
 use std::io;
 use std::process::Command;
@@ -17,16 +17,17 @@ pub struct Driver {
 
 impl Driver {
     pub fn new(mut arg_vec: Vec<String>) -> Driver {
+        // This is a new line which should be tracked by gitgutter
         let input_file_name = arg_vec.remove(1);
         let file_name_tuple = Driver::make_file_names(input_file_name.clone());
-        let driver_arg_vec = Driver::make_driver_args(&arg_vec);
+        let driver_args = Driver::make_driver_args(&arg_vec);
 
         Driver {
             source_file: input_file_name,
             preprocessor_file: file_name_tuple.0,
             assembly_file: file_name_tuple.1,
             output_file: file_name_tuple.2,
-            driver_arg_vec: driver_arg_vec,
+            driver_arg_vec: driver_args,
             perform_lex: false,
             perform_parse: false,
             perform_codegen: false,
