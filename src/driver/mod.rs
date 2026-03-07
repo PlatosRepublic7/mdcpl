@@ -1,6 +1,6 @@
 mod lexer;
 use lexer::Lexer;
-
+use crate::diagnostics::DiagnosticEngine;
 use std::io;
 use std::process::Command;
 
@@ -17,7 +17,6 @@ pub struct Driver {
 
 impl Driver {
     pub fn new(mut arg_vec: Vec<String>) -> Driver {
-        // This is a new line which should be tracked by gitgutter
         let input_file_name = arg_vec.remove(1);
         let file_name_tuple = Driver::make_file_names(input_file_name.clone());
         let driver_args = Driver::make_driver_args(&arg_vec);
@@ -34,16 +33,20 @@ impl Driver {
         }
     }
 
-    pub fn run(&mut self) -> io::Result<()> {
+    pub fn run(&mut self, diag_engine: &mut DiagnosticEngine) -> io::Result<()> {
         // Process arguments first
         self.process_driver_args()?;
 
         // Run the Preprocessor first
         self.preprocess()?;
 
-        if self.perform_lex {}
+        if self.perform_lex {
+            todo!();
+        }
 
-        if self.perform_parse {}
+        if self.perform_parse {
+            todo!();
+        }
 
         if self.perform_codegen {
             // Run the Assemler and Linker
@@ -67,7 +70,7 @@ impl Driver {
         (preprocessor_file, assembly_file, source_file)
     }
 
-    fn make_driver_args(arg_vec: &Vec<String>) -> Vec<String> {
+    fn make_driver_args(arg_vec: &[String]) -> Vec<String> {
         // It is assumed here that all the arguments passed to this method will have the following:
         // [program_name(not needed), needed_args...]
         let mut driver_arg_vec: Vec<String> = Vec::new();
