@@ -1,3 +1,5 @@
+use crate::source::SourceLocation;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Severity {
     Fatal,
@@ -13,12 +15,21 @@ pub enum LexerDiagnosticKind {
     UnterminatedStringLiteral,
 }
 
+#[derive(Clone)]
 pub struct DiagnosticLocation {
-    filename: String,
-    line_number: u64,
-    column_number: u64,
-    span: (u16, u16),
+    source_location: SourceLocation,
+    span_end: usize,
     source_line: String
+}
+
+impl DiagnosticLocation {
+    pub fn new(source_loc: &SourceLocation, sp: usize, sline: &str) -> Self {
+        DiagnosticLocation {
+            source_location: source_loc.clone(),
+            span_end: sp,
+            source_line: sline.to_owned()
+        }
+    }
 }
 
 pub struct Diagnostic {
@@ -30,13 +41,14 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn new(sev: Severity, diag_kind: DiagnosticKind, message_str: String, loc: DiagnosticLocation) -> Diagnostic {
+    pub fn new(sev: Severity, diag_kind: DiagnosticKind, message_str: &str, loc: SourceLocation, span_end: usize, source_line: &str) -> Self {
         let children_vec: Vec<Diagnostic> = Vec::new();
+        let diag_loc: DiagnosticLocation = DiagnosticLocation::new(&loc, span_end, source_line);
         Diagnostic {
             severity: sev,
             kind: diag_kind,
-            message: message_str,
-            location: loc,
+            message: message_str.to_owned(),
+            location: diag_loc,
             children: children_vec
         }
     }
@@ -50,7 +62,7 @@ pub struct DiagnosticEngine {
 }
 
 impl DiagnosticEngine {
-    pub fn new() -> DiagnosticEngine {
+    pub fn new() -> Self {
         let diag_vec: Vec<Diagnostic> = Vec::new();
         let err_count: u64 = 0;
         let war_count: u64 = 0;
@@ -64,8 +76,8 @@ impl DiagnosticEngine {
         }
     }
 
-    pub fn emit(&mut self, severity: Severity, kind: DiagnosticKind, message: String, location: DiagnosticLocation) -> bool {
-        let diagnostic: Diagnostic = Diagnostic::new(severity, kind, message, location);
+    pub fn emit(&mut self, severity: Severity, kind: DiagnosticKind, message: &str, location: SourceLocation, span_end: usize, source_line: &str) -> bool {
+        let diagnostic: Diagnostic = Diagnostic::new(severity, kind, message, location, span_end, source_line);
         let cur_severity = diagnostic.severity.clone();
         self.diagnostics_vec.push(diagnostic);
 

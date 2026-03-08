@@ -1,7 +1,8 @@
-mod lexer;
-use lexer::Lexer;
+use crate::lexer::Lexer;
+use crate::lexer::token::Token;
 use crate::diagnostics::DiagnosticEngine;
 use std::io;
+use std::fs;
 use std::process::Command;
 
 pub struct Driver {
@@ -16,7 +17,7 @@ pub struct Driver {
 }
 
 impl Driver {
-    pub fn new(mut arg_vec: Vec<String>) -> Driver {
+    pub fn new(mut arg_vec: Vec<String>) -> Self {
         let input_file_name = arg_vec.remove(1);
         let file_name_tuple = Driver::make_file_names(input_file_name.clone());
         let driver_args = Driver::make_driver_args(&arg_vec);
@@ -38,10 +39,18 @@ impl Driver {
         self.process_driver_args()?;
 
         // Run the Preprocessor first
+        // This will become a full-fledged stage in the future
+        // REMEMBER: We need to delete the preprocessed file after lexing and parsing!
         self.preprocess()?;
+       
+        // Create token_vec so that it won't be out of scope when needed for parsing stage
+        let mut token_vec: Vec<Token> = Vec::new();
 
+        // Tokenize
         if self.perform_lex {
-            todo!();
+            let source_text = fs::read_to_string(&self.preprocessor_file)?;
+            let lexer: Lexer = Lexer::new(source_text, &self.preprocessor_file);
+            token_vec = lexer.tokenize(diag_engine);
         }
 
         if self.perform_parse {
@@ -52,6 +61,9 @@ impl Driver {
             // Run the Assemler and Linker
             self.assemble_and_link()?;
         }
+       
+        // Clean up intermediate files
+        self.cleanup()?;
 
         Ok(())
     }
@@ -145,6 +157,13 @@ impl Driver {
                 "Linking setp failed with non-zero exit code",
             ));
         }
+
+        Ok(())
+    }
+
+    fn cleanup(&mut self) -> io::Result<()> {
+        // Perform cleanup of intermediate files
+        fs::remove_file(&self.preprocessor_file)?;
 
         Ok(())
     }
