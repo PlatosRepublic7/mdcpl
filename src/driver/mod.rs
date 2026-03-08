@@ -1,3 +1,5 @@
+mod arg_driver;
+use arg_driver::{ArgDriver, CompilerOptions, CompilerStage};
 use crate::lexer::Lexer;
 use crate::lexer::token::Token;
 use crate::diagnostics::DiagnosticEngine;
@@ -9,66 +11,61 @@ pub struct Driver {
     pub source_file: String,
     pub preprocessor_file: String,
     pub assembly_file: String,
-    pub output_file: String,
-    pub driver_arg_vec: Vec<String>,
-    perform_lex: bool,
-    perform_parse: bool,
-    perform_codegen: bool,
+    compiler_options: CompilerOptions
 }
 
 impl Driver {
-    pub fn new(mut arg_vec: Vec<String>) -> Self {
-        let input_file_name = arg_vec.remove(1);
-        let file_name_tuple = Driver::make_file_names(input_file_name.clone());
-        let driver_args = Driver::make_driver_args(&arg_vec);
+    pub fn new(mut arg_vec: Vec<String>) -> Result<Self, io::Error> {
+        // Remove the first argument (it's the name of the compiler itself)
+        arg_vec.remove(0);
+        let mut arg_driver = ArgDriver::new(arg_vec);
+        let compiler_opts = arg_driver.parse()?;
 
-        Driver {
-            source_file: input_file_name,
-            preprocessor_file: file_name_tuple.0,
-            assembly_file: file_name_tuple.1,
-            output_file: file_name_tuple.2,
-            driver_arg_vec: driver_args,
-            perform_lex: false,
-            perform_parse: false,
-            perform_codegen: false,
-        }
+        Ok(Driver {
+            source_file: "".to_string(),
+            preprocessor_file: "".to_string(),
+            assembly_file: "".to_string(),
+            compiler_options: compiler_opts
+        })
     }
 
     pub fn run(&mut self, diag_engine: &mut DiagnosticEngine) -> io::Result<()> {
-        // Process arguments first
-        self.process_driver_args()?;
-
         // Run the Preprocessor first
         // This will become a full-fledged stage in the future
         // REMEMBER: We need to delete the preprocessed file after lexing and parsing!
-        self.preprocess()?;
-       
-        // Create token_vec so that it won't be out of scope when needed for parsing stage
-        let mut token_vec: Vec<Token> = Vec::new();
+        // We will loop through all the compiler_options.input_files and perform the pipeline on
+        // each one
 
-        // Tokenize
-        if self.perform_lex {
-            let source_text = fs::read_to_string(&self.preprocessor_file)?;
-            let lexer: Lexer = Lexer::new(source_text, &self.preprocessor_file);
-            token_vec = lexer.tokenize(diag_engine);
-        }
+        for source_file in self.compiler_options.input_files.clone() {
+            self.make_file_names(source_file.to_string());
+            self.preprocess(&source_file)?;
+           
+            // Create token_vec so that it won't be out of scope when needed for parsing stage
+            let mut token_vec: Vec<Token> = Vec::new();
 
-        if self.perform_parse {
-            todo!();
-        }
+            // Tokenize
+            if self.compiler_options.stop_stage == CompilerStage::Lex {
+                let source_text = fs::read_to_string(&self.preprocessor_file)?;
+                let lexer: Lexer = Lexer::new(source_text, &self.preprocessor_file);
+                token_vec = lexer.tokenize(diag_engine);
+            }
 
-        if self.perform_codegen {
-            // Run the Assemler and Linker
-            self.assemble_and_link()?;
+            if self.compiler_options.stop_stage == CompilerStage::Parse {
+                todo!();
+            }
+        
+            if self.compiler_options.stop_stage == CompilerStage::Assemble {
+                // Run the Assemler and Linker
+                self.assemble_and_link()?;
+            }
+
+            self.cleanup()?;
         }
-       
-        // Clean up intermediate files
-        self.cleanup()?;
 
         Ok(())
     }
 
-    fn make_file_names(input_file: String) -> (String, String, String) {
+    fn make_file_names(&mut self, input_file: String) {
         let mut extension_index: usize = 0;
 
         // Find the index within the input_file string (starting at the right)
@@ -76,59 +73,17 @@ impl Driver {
             extension_index = index;
         };
 
-        let preprocessor_file: String = input_file[..extension_index].to_string() + ".i";
-        let assembly_file: String = input_file[..extension_index].to_string() + ".s";
-        let source_file: String = input_file[..extension_index].to_string();
-        (preprocessor_file, assembly_file, source_file)
+        self.preprocessor_file = input_file[..extension_index].to_string() + ".i";
+        self.assembly_file = input_file[..extension_index].to_string() + ".s";
+        self.source_file = input_file[..extension_index].to_string();
     }
 
-    fn make_driver_args(arg_vec: &[String]) -> Vec<String> {
-        // It is assumed here that all the arguments passed to this method will have the following:
-        // [program_name(not needed), needed_args...]
-        let mut driver_arg_vec: Vec<String> = Vec::new();
-        for i in 1..arg_vec.iter().len() {
-            driver_arg_vec.push(arg_vec[i].clone());
-        }
-
-        driver_arg_vec
-    }
-
-    fn process_driver_args(&mut self) -> io::Result<()> {
-        for arg in &self.driver_arg_vec {
-            match arg.as_str() {
-                "--lex" => {
-                    self.perform_lex = true;
-                    self.perform_parse = false;
-                    self.perform_codegen = false;
-                }
-                "--parse" => {
-                    self.perform_lex = true;
-                    self.perform_parse = true;
-                    self.perform_codegen = false;
-                }
-                "--codegen" => {
-                    self.perform_lex = true;
-                    self.perform_parse = true;
-                    self.perform_codegen = true;
-                }
-                _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Unrecognized driver argument",
-                    ));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn preprocess(&self) -> io::Result<()> {
+    fn preprocess(&self, cur_source_file: &str) -> io::Result<()> {
         // Perform the preprocessing stage
         let status = Command::new("gcc")
             .arg("-E")
             .arg("-P")
-            .arg(&self.source_file)
+            .arg(cur_source_file)
             .arg("-o")
             .arg(&self.preprocessor_file)
             .status()?;
@@ -148,7 +103,7 @@ impl Driver {
         let status = Command::new("gcc")
             .arg(&self.assembly_file)
             .arg("-o")
-            .arg(&self.output_file)
+            .arg(&self.compiler_options.output_file.as_deref().unwrap_or("a.out"))
             .status()?;
 
         if !status.success() {

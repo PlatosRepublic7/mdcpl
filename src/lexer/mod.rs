@@ -41,15 +41,80 @@ impl Lexer {
             if c.is_whitespace() {
                 self.advance();
             } else if c.is_alphabetic() || c == '_' {
-                self.id_or_k_scanner(current_line, current_col, diag_engine);
+                self.id_or_kw_scanner(current_line, current_col, diag_engine);
             } else if c.is_ascii_punctuation() {
                 self.punctuation_scanner(current_line, current_col, diag_engine);
+            } else if c.is_numeric() {
+                self.numeric_scanner(current_line, current_col, diag_engine);
             }
             current_line = self.cur_line;
             current_col = self.cur_column;
         }
         
         self.token_vec
+    }
+
+    fn numeric_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
+        let mut lexeme = String::new();
+
+        // We can keep track of whether of not a decimal point appears in the lexeme
+        // If it does, we can make sure that it isn't the last character in the lexeme,
+        // and that there is only one present within the lexeme, otherwise we throw an error
+        let mut point_count: u8 = 0;
+        let mut found_error: bool = false;
+        let mut error_message = "";
+        let mut found_warning: bool = false;
+        let mut warning_message = "";
+        let token_kind: TokenKind;
+        let mut lexer_diag: LexerDiagnosticKind = LexerDiagnosticKind::Null;
+
+        while let Some(c) = self.peek() {
+            if c.is_numeric() {
+                lexeme += &c.to_string();
+                self.advance();
+            } else if c == '.' {
+                point_count += 1;
+                if point_count > 1 {
+                    found_error = true;
+                    error_message = "multiple decimal points in floating point literal";
+                    lexer_diag = LexerDiagnosticKind::MultipleDecimalPointsInFloat;
+                    break;
+                }
+                lexeme += &c.to_string();
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        if let Some(c) = lexeme.chars().last() && c == '.' {
+            found_warning = true;
+            warning_message = "trailing decimal point found in float literal, consider adding a trailing '0'";
+            lexer_diag = LexerDiagnosticKind::TrailingDecimalPointInFloat;
+        }
+
+        if point_count == 1 {
+            token_kind = TokenKind::FloatingPoint;
+        } else {
+            token_kind = TokenKind::Integer;
+        }
+
+        let mut severity: Severity = Severity::Fatal;
+        let mut diag_message: String = String::new();
+        if found_error {
+            severity = Severity::Error;
+            diag_message = String::from(error_message);
+        }
+        if found_warning {
+            severity = Severity::Warning;
+            diag_message = String::from(warning_message);
+        }
+
+        if found_error || found_warning {
+            self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, diag_message, start_line, start_col);
+        }
+
+        self.create_token(token_kind, lexeme, start_line, start_col);
     }
 
     fn punctuation_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
@@ -76,7 +141,7 @@ impl Lexer {
         self.create_token(token_kind, lexeme, start_line, start_col);
     }
 
-    fn id_or_k_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
+    fn id_or_kw_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
         // Scans for identifiers or keywords
         let mut lexeme = String::new();
         while let Some(c) = self.peek() {
@@ -140,7 +205,36 @@ impl Lexer {
         let diag_kind: DiagnosticKind = DiagnosticKind::Lexer(lexer_diag);
         let source_location: SourceLocation = SourceLocation::new(&self.filename, start_line, start_col);
         let span_end = self.cur_column - start_col;
-        diag_engine.emit(severity, diag_kind, &message, source_location, span_end, "")
+        let source_line = self.current_line_text();
+        diag_engine.emit(severity, diag_kind, &message, source_location, span_end, Some(source_line.as_str()))
+    }
+
+    fn current_line_text(&self) -> String {
+        // Produces the current line of text from the source code for Diagnostic's
+        // Find the beginning index of the line
+        let mut rev_offset: usize = 0;
+        
+        for c in self.source_text[..self.cur_pos].chars().rev() {
+            if c == '\n' {
+                break;
+            }
+            rev_offset += c.len_utf8();
+        }
+
+        // Find the end of the line
+        let mut forward_offset: usize = 0;
+
+        for c in self.source_text[self.cur_pos..].chars() {
+            if c == '\n' {
+                break;
+            }
+            forward_offset += c.len_utf8();
+        }
+
+        let beginning_offset = self.cur_pos - rev_offset;
+        let ending_offset = self.cur_pos + forward_offset;
+
+        self.source_text[beginning_offset..ending_offset].to_owned()
     }
 
     fn build_keyword_table() -> HashMap<String, TokenKind> {
@@ -198,4 +292,40 @@ impl Lexer {
         
         punc_table
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod keyword_tests {
+        use super::*;
+        #[test]
+        fn test_int_keyword() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("int"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+
+            assert_eq!(tokens.len(), 1);
+            assert_eq!(tokens[0].kind, TokenKind::Int);
+            assert_eq!(tokens[0].lexeme, "int");
+        }
+    }
+
+    mod numeric_tests {
+        use super::*;
+        #[test]
+        fn test_multiple_decimal_points() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("1.2.3"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+
+            assert_eq!(diag_engine.error_count, 1);
+
+            for token in tokens {
+                println!("{:#?}", token);
+            }
+        }
+    }
+
 }

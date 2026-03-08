@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceLocation {
     file_name: String,
     line_num: usize,

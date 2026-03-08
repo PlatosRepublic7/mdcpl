@@ -12,7 +12,7 @@ fn main() -> io::Result<()> {
     let arg_vec: Vec<String> = env::args().collect();
 
     let mut diagnostic_engine: DiagnosticEngine = DiagnosticEngine::new();
-    let mut driver: Driver = Driver::new(arg_vec);
+    let mut driver: Driver = Driver::new(arg_vec)?;
     
     driver.run(&mut diagnostic_engine)?;
     Ok(())

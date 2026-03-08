@@ -1,10 +1,9 @@
 use crate::source::SourceLocation;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     // Identifiers
     Identifier,
-    Constant,
 
     // Numeric
     Integer,
@@ -86,10 +85,11 @@ pub enum TokenKind {
     Eof
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Token {
-    kind: TokenKind,
-    lexeme: String,
-    location: SourceLocation
+    pub kind: TokenKind,
+    pub lexeme: String,
+    pub location: SourceLocation
 }
 
 impl Token {

@@ -14,21 +14,24 @@ pub enum DiagnosticKind {
 pub enum LexerDiagnosticKind {
     UnterminatedStringLiteral,
     InvalidIdentifier,
+    MultipleDecimalPointsInFloat,
+    TrailingDecimalPointInFloat,
+    Null
 }
 
 #[derive(Clone)]
 pub struct DiagnosticLocation {
     source_location: SourceLocation,
     span_end: usize,
-    source_line: String
+    source_line: Option<String>
 }
 
 impl DiagnosticLocation {
-    pub fn new(source_loc: &SourceLocation, sp: usize, sline: &str) -> Self {
+    pub fn new(source_loc: &SourceLocation, sp: usize, sline: Option<&str>) -> Self {
         DiagnosticLocation {
             source_location: source_loc.clone(),
             span_end: sp,
-            source_line: sline.to_owned()
+            source_line: sline.map(|s| s.to_owned())
         }
     }
 }
@@ -42,7 +45,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn new(sev: Severity, diag_kind: DiagnosticKind, message_str: &str, loc: SourceLocation, span_end: usize, source_line: &str) -> Self {
+    pub fn new(sev: Severity, diag_kind: DiagnosticKind, message_str: &str, loc: SourceLocation, span_end: usize, source_line: Option<&str>) -> Self {
         let children_vec: Vec<Diagnostic> = Vec::new();
         let diag_loc: DiagnosticLocation = DiagnosticLocation::new(&loc, span_end, source_line);
         Diagnostic {
@@ -56,10 +59,10 @@ impl Diagnostic {
 }
 
 pub struct DiagnosticEngine {
-    diagnostics_vec: Vec<Diagnostic>,
-    error_count: u64,
-    warning_count: u64,
-    has_fatal: bool
+    pub diagnostics_vec: Vec<Diagnostic>,
+    pub error_count: u64,
+    pub warning_count: u64,
+    pub has_fatal: bool
 }
 
 impl DiagnosticEngine {
@@ -77,7 +80,7 @@ impl DiagnosticEngine {
         }
     }
 
-    pub fn emit(&mut self, severity: Severity, kind: DiagnosticKind, message: &str, location: SourceLocation, span_end: usize, source_line: &str) -> bool {
+    pub fn emit(&mut self, severity: Severity, kind: DiagnosticKind, message: &str, location: SourceLocation, span_end: usize, source_line: Option<&str>) -> bool {
         let diagnostic: Diagnostic = Diagnostic::new(severity, kind, message, location, span_end, source_line);
         let cur_severity = diagnostic.severity.clone();
         self.diagnostics_vec.push(diagnostic);
