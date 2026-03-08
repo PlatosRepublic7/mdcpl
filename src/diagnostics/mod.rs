@@ -13,6 +13,7 @@ pub enum DiagnosticKind {
 
 pub enum LexerDiagnosticKind {
     UnterminatedStringLiteral,
+    InvalidIdentifier,
 }
 
 #[derive(Clone)]

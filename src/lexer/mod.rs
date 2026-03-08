@@ -1,14 +1,18 @@
 pub mod token;
 use token::{Token, TokenKind};
-use crate::diagnostics::DiagnosticEngine;
+use crate::source::SourceLocation;
+use crate::diagnostics::{DiagnosticEngine, DiagnosticKind, LexerDiagnosticKind, Severity};
+use std::collections::HashMap;
 
 pub struct Lexer {
     source_text: String,
     filename: String,
     cur_pos: usize,
-    cur_line: u64,
-    cur_column: u64,
-    token_vec: Vec<Token>
+    cur_line: usize,
+    cur_column: usize,
+    token_vec: Vec<Token>,
+    keyword_table: HashMap<String, TokenKind>,
+    punctuation_table: HashMap<String, TokenKind>
 }
 
 impl Lexer {
@@ -19,26 +23,98 @@ impl Lexer {
             source_text: text,
             filename: fname.to_owned(),
             cur_pos: 0,
-            cur_line: 0,
+            cur_line: 1,
             cur_column: 0,
-            token_vec: t_vec
+            token_vec: t_vec,
+            keyword_table: Self::build_keyword_table(),
+            punctuation_table: Self::build_punctuation_table()
         }
     }
 
     pub fn tokenize(mut self, diag_engine: &mut DiagnosticEngine) -> Vec<Token> {
         // Lexer for a preprocessed .i file
-        
+        let mut current_line: usize = 1;
+        let mut current_col: usize = 0;
+
         // Iterate through self.source_text a character at a time
         while let Some(c) = self.peek() {
-            println!("Current char: {}", c);
-            self.advance();
+            if c.is_whitespace() {
+                self.advance();
+            } else if c.is_alphabetic() || c == '_' {
+                self.id_or_k_scanner(current_line, current_col, diag_engine);
+            } else if c.is_ascii_punctuation() {
+                self.punctuation_scanner(current_line, current_col, diag_engine);
+            }
+            current_line = self.cur_line;
+            current_col = self.cur_column;
         }
         
         self.token_vec
     }
 
+    fn punctuation_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
+        let mut lexeme = String::new();
+        while let Some(c) = self.peek() {
+            if c.is_ascii_punctuation() {
+                lexeme += &c.to_string();
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let token_kind: TokenKind;
+        match self.punctuation_table.get(lexeme.as_str()).cloned() {
+            Some(kind) => {
+                token_kind = kind;
+            }
+            None => {
+                token_kind = TokenKind::Unknown;
+            }
+        }
+
+        self.create_token(token_kind, lexeme, start_line, start_col);
+    }
+
+    fn id_or_k_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
+        // Scans for identifiers or keywords
+        let mut lexeme = String::new();
+        while let Some(c) = self.peek() {
+            if c.is_alphanumeric() || c == '_' {
+                lexeme += &c.to_string();
+                self.advance();
+            } else if c == '\n' || c.is_whitespace() || c.is_ascii_punctuation() {
+                break;
+            } else {
+                let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidIdentifier;
+                let severity: Severity = Severity::Error;
+                let err_message = String::from("invalid identifier");
+                self.create_lexer_diagnostic(diag_engine, lexer_error, severity, err_message, start_line, start_col);
+            }
+        }
+
+        let token_kind: TokenKind;
+
+        // Determine the TokenKind (Keyword or Identifier)
+        match self.keyword_table.get(lexeme.as_str()).cloned() {
+            Some(kind) => {
+                token_kind = kind;
+            },
+            None => {
+                token_kind = TokenKind::Identifier;
+            }
+        }
+
+        // Create the token 
+        self.create_token(token_kind, lexeme, start_line, start_col);
+    }
+
     fn peek(&self) -> Option<char> {
         self.source_text[self.cur_pos..].chars().next()
+    }
+
+    fn peek_next(&self) -> Option<char> {
+        self.source_text[self.cur_pos+1..].chars().next()
     }
 
     fn advance(&mut self) -> Option<char> {
@@ -51,5 +127,75 @@ impl Lexer {
         }
 
         Some(c)
+    }
+
+    fn create_token(&mut self, token_kind: TokenKind, lexeme: String, start_line: usize, start_col: usize) {
+        // Create SourceLocation object
+        let source_location: SourceLocation = SourceLocation::new(&self.filename, start_line, start_col);
+        let token: Token = Token::new(token_kind, lexeme, source_location);
+        self.token_vec.push(token);
+    }
+
+    fn create_lexer_diagnostic(&self, diag_engine: &mut DiagnosticEngine, lexer_diag: LexerDiagnosticKind, severity: Severity, message: String, start_line: usize, start_col: usize) -> bool {
+        let diag_kind: DiagnosticKind = DiagnosticKind::Lexer(lexer_diag);
+        let source_location: SourceLocation = SourceLocation::new(&self.filename, start_line, start_col);
+        let span_end = self.cur_column - start_col;
+        diag_engine.emit(severity, diag_kind, &message, source_location, span_end, "")
+    }
+
+    fn build_keyword_table() -> HashMap<String, TokenKind> {
+        let mut keyword_table: HashMap<String, TokenKind> = HashMap::new();
+        keyword_table.insert("char".to_owned(), TokenKind::Char);
+        keyword_table.insert("double".to_owned(), TokenKind::Double);
+        keyword_table.insert("float".to_owned(), TokenKind::Float);
+        keyword_table.insert("int".to_owned(), TokenKind::Int);
+        keyword_table.insert("long".to_owned(), TokenKind::Long);
+        keyword_table.insert("short".to_owned(), TokenKind::Short);
+        keyword_table.insert("signed".to_owned(), TokenKind::Signed);
+        keyword_table.insert("unsigned".to_owned(), TokenKind::Unsigned);
+        keyword_table.insert("void".to_owned(), TokenKind::Void);
+        keyword_table.insert("auto".to_owned(), TokenKind::Auto);
+        keyword_table.insert("const".to_owned(), TokenKind::Const);
+        keyword_table.insert("extern".to_owned(), TokenKind::Extern);
+        keyword_table.insert("register".to_owned(), TokenKind::Register);
+        keyword_table.insert("static".to_owned(), TokenKind::Static);
+        keyword_table.insert("volatile".to_owned(), TokenKind::Volatile);
+        keyword_table.insert("break".to_owned(), TokenKind::Break);
+        keyword_table.insert("case".to_owned(), TokenKind::Case);
+        keyword_table.insert("continue".to_owned(), TokenKind::Continue);
+        keyword_table.insert("default".to_owned(), TokenKind::Default);
+        keyword_table.insert("do".to_owned(), TokenKind::Do);
+        keyword_table.insert("else".to_owned(), TokenKind::Else);
+        keyword_table.insert("for".to_owned(), TokenKind::For);
+        keyword_table.insert("goto".to_owned(), TokenKind::Goto);
+        keyword_table.insert("if".to_owned(), TokenKind::If);
+        keyword_table.insert("return".to_owned(), TokenKind::Return);
+        keyword_table.insert("switch".to_owned(), TokenKind::Switch);
+        keyword_table.insert("while".to_owned(), TokenKind::While);
+        keyword_table.insert("enum".to_owned(), TokenKind::Enum);
+        keyword_table.insert("sizeof".to_owned(), TokenKind::Sizeof);
+        keyword_table.insert("struct".to_owned(), TokenKind::Struct);
+        keyword_table.insert("typedef".to_owned(), TokenKind::Typedef);
+        keyword_table.insert("union".to_owned(), TokenKind::Union);
+
+        keyword_table
+    }
+
+    fn build_punctuation_table() -> HashMap<String, TokenKind> {
+        let mut punc_table: HashMap<String, TokenKind> = HashMap::new();
+        punc_table.insert("(".to_owned(), TokenKind::LeftParen);
+        punc_table.insert(")".to_owned(), TokenKind::RightParen);
+        punc_table.insert("[".to_owned(), TokenKind::LeftBracket);
+        punc_table.insert("]".to_owned(), TokenKind::RightBracket);
+        punc_table.insert("{".to_owned(), TokenKind::LeftBrace);
+        punc_table.insert("}".to_owned(), TokenKind::RightBrace);
+        punc_table.insert("\"".to_owned(), TokenKind::DoubleQuote);
+        punc_table.insert("\'".to_owned(), TokenKind::SingleQuote);
+        punc_table.insert(";".to_owned(), TokenKind::Semicolon);
+        punc_table.insert(":".to_owned(), TokenKind::Colon);
+        punc_table.insert(",".to_owned(), TokenKind::Comma);
+        punc_table.insert(".".to_owned(), TokenKind::Point);
+        
+        punc_table
     }
 }

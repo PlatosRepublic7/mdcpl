@@ -1,12 +1,12 @@
 #[derive(Clone)]
 pub struct SourceLocation {
     file_name: String,
-    line_num: u64,
-    column_num: u64
+    line_num: usize,
+    column_num: usize
 }
 
 impl SourceLocation {
-    pub fn new(fname: &String, line: u64, col: u64) -> Self {
+    pub fn new(fname: &String, line: usize, col: usize) -> Self {
         SourceLocation {
             file_name: fname.clone(),
             line_num: line,
