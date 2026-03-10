@@ -126,6 +126,11 @@ impl Lexer {
         let mut lexeme = String::new();
         while let Some(c) = self.peek() {
             if c.is_ascii_punctuation() {
+                // NOTE: This is a temporary fix for this stage of the lexer. We will need to
+                // handle logical operators (==, <=, !=, etc.) at a later stage of development.
+                if lexeme.len() == 1 {
+                    break;
+                }
                 lexeme += &c.to_string();
                 self.advance();
             } else {
