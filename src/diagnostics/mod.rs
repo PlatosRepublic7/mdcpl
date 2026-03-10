@@ -20,7 +20,7 @@ pub enum LexerDiagnosticKind {
     Null
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DiagnosticLocation {
     source_location: SourceLocation,
     span_end: usize,
@@ -59,11 +59,53 @@ impl Diagnostic {
     }
 }
 
+struct DiagnosticRenderer;
+
+impl DiagnosticRenderer {
+    fn render(diagnostics_vec: &[Diagnostic]) {
+        for diagnostic in diagnostics_vec {
+            let source_location_str: String = format!("{}:{}:{}:", diagnostic.location.source_location.file_name, diagnostic.location.source_location.line_num, diagnostic.location.source_location.column_num);
+            let mut severity_str: String = String::from("");
+            match diagnostic.severity {
+                Severity::Error => {
+                    severity_str = "error".to_string();
+                }
+                Severity::Warning => {
+                    severity_str = "warning".to_string();
+                }
+                Severity::Fatal => {
+                    severity_str = "fatal".to_string();
+                }
+            }
+            
+            let information_str: String = format!("{} {}: {}", source_location_str, severity_str, diagnostic.message);
+            eprintln!("{}", information_str);
+
+            if let Some(ref source_line) = diagnostic.location.source_line {
+                eprintln!("\t{}", source_line);
+                let total_indicator_chars = &(diagnostic.location.source_location.column_num + diagnostic.location.span_end);
+                let mut indicator_str: String = String::with_capacity(*total_indicator_chars);
+                for i in 0..*total_indicator_chars {
+                    if i < diagnostic.location.source_location.column_num {
+                        indicator_str.insert(i, ' ');
+                    } else if i == diagnostic.location.source_location.column_num {
+                        indicator_str.insert(i, '^');
+                    } else {
+                        indicator_str.insert(i, '~');
+                    }
+                }
+                eprintln!("\t{}", indicator_str);
+            }
+        }
+    }
+}
+
 pub struct DiagnosticEngine {
     pub diagnostics_vec: Vec<Diagnostic>,
     pub error_count: u64,
     pub warning_count: u64,
-    pub has_fatal: bool
+    pub has_fatal: bool,
+    pub exit_code: i32
 }
 
 impl DiagnosticEngine {
@@ -77,7 +119,8 @@ impl DiagnosticEngine {
             diagnostics_vec: diag_vec,
             error_count: err_count,
             warning_count: war_count,
-            has_fatal: fatal
+            has_fatal: fatal,
+            exit_code: 0
         }
     }
 
@@ -97,11 +140,22 @@ impl DiagnosticEngine {
                 self.has_fatal = true;
             }
         }
-
+ 
         if self.has_fatal {
             return false
         }
 
         true
+    }
+
+    pub fn has_errors(&self) -> bool {
+        if self.error_count > 0 {
+            return true
+        }
+        false
+    }
+
+    pub fn render(&self) {
+        DiagnosticRenderer::render(&self.diagnostics_vec);
     }
 }

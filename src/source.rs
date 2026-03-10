@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceLocation {
-    file_name: String,
-    line_num: usize,
-    column_num: usize
+    pub file_name: String,
+    pub line_num: usize,
+    pub column_num: usize
 }
 
 impl SourceLocation {

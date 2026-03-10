@@ -82,6 +82,11 @@ impl Lexer {
                 }
                 lexeme += &c.to_string();
                 self.advance();
+            } else if c.is_alphabetic() {
+                found_error = true;
+                error_message = "invalid identifier";
+                lexer_diag = LexerDiagnosticKind::InvalidIdentifier;
+                break;
             } else {
                 break;
             }
