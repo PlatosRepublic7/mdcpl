@@ -1,5 +1,5 @@
 mod arg_driver;
-use arg_driver::{ArgDriver, CompilerOptions, CompilerStage};
+use arg_driver::{ArgDriver, CompilerOptions, CompilerStage, OptimizationLevel};
 use crate::lexer::Lexer;
 use crate::lexer::token::Token;
 use crate::diagnostics::DiagnosticEngine;
@@ -123,3 +123,5 @@ impl Driver {
         Ok(())
     }
 }
+
+

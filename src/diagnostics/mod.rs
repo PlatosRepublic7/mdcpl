@@ -16,6 +16,7 @@ pub enum LexerDiagnosticKind {
     InvalidIdentifier,
     MultipleDecimalPointsInFloat,
     TrailingDecimalPointInFloat,
+    InvalidCharacter,
     Null
 }
 

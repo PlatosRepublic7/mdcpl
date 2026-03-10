@@ -134,7 +134,12 @@ impl Lexer {
                 token_kind = kind;
             }
             None => {
+                // Unknown token, create a lexical diagnostic 
                 token_kind = TokenKind::Unknown;
+                let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidCharacter;
+                let severity: Severity = Severity::Error;
+                let err_message = format!("invalid character: {}", lexeme);
+                self.create_lexer_diagnostic(diag_engine, lexer_error, severity, err_message, start_line, start_col);
             }
         }
 
@@ -153,7 +158,7 @@ impl Lexer {
             } else {
                 let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidIdentifier;
                 let severity: Severity = Severity::Error;
-                let err_message = String::from("invalid identifier");
+                let err_message = format!("invalid identifier: {}", lexeme);
                 self.create_lexer_diagnostic(diag_engine, lexer_error, severity, err_message, start_line, start_col);
             }
         }
