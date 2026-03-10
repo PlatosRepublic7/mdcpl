@@ -8,7 +8,13 @@ pub enum Severity {
 }
 
 pub enum DiagnosticKind {
-    Lexer(LexerDiagnosticKind)
+    Lexer(LexerDiagnosticKind),
+    Parser(ParserDiagnosticKind)
+}
+
+pub enum ParserDiagnosticKind {
+    UnexpectedToken,
+    UnexpectedEndOfInput
 }
 
 pub enum LexerDiagnosticKind {
