@@ -2,6 +2,7 @@ mod driver;
 mod diagnostics;
 mod lexer;
 mod source;
+mod parser;
 use crate::driver::Driver;
 use crate::diagnostics::DiagnosticEngine;
 

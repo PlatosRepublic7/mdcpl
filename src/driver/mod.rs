@@ -2,6 +2,7 @@ mod arg_driver;
 use arg_driver::{ArgDriver, CompilerOptions, CompilerStage, OptimizationLevel};
 use crate::lexer::Lexer;
 use crate::lexer::token::Token;
+use crate::parser::Parser;
 use crate::diagnostics::DiagnosticEngine;
 use std::io;
 use std::fs;

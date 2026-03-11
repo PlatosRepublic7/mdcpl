@@ -8,16 +8,53 @@ pub enum Severity {
 }
 
 pub enum DiagnosticKind {
-    Lexer(LexerDiagnosticKind)
+    Lexer(LexerDiagnosticKind),
+    Parser(ParserDiagnosticKind)
+}
+
+impl DiagnosticKind {
+    pub fn message(&self) -> String {
+        match self {
+            DiagnosticKind::Lexer(inner) => inner.message(),
+            DiagnosticKind::Parser(inner) => inner.message()
+        }
+    }
+}
+
+pub enum ParserDiagnosticKind {
+    UnexpectedToken,
+    UnexpectedEndOfInput
+}
+
+impl ParserDiagnosticKind {
+    pub fn message(&self) -> String {
+        match self {
+            ParserDiagnosticKind::UnexpectedToken => String::from("unexpected token"),
+            ParserDiagnosticKind::UnexpectedEndOfInput => String::from("unexpected end of input")
+        }
+    }
 }
 
 pub enum LexerDiagnosticKind {
     UnterminatedStringLiteral,
-    InvalidIdentifier,
+    InvalidIdentifier(String),
     MultipleDecimalPointsInFloat,
     TrailingDecimalPointInFloat,
-    InvalidCharacter,
+    InvalidCharacter(String),
     Null
+}
+
+impl LexerDiagnosticKind {
+    pub fn message(&self) -> String {
+        match self {
+            LexerDiagnosticKind::Null => String::from("NULL"),
+            LexerDiagnosticKind::UnterminatedStringLiteral => String::from("unterminated string literal"),
+            LexerDiagnosticKind::InvalidIdentifier(s) => s.to_string(),
+            LexerDiagnosticKind::MultipleDecimalPointsInFloat => String::from("multiple decimal points in float literal"),
+            LexerDiagnosticKind::TrailingDecimalPointInFloat => String::from("trailing decimal point in float literal"),
+            LexerDiagnosticKind::InvalidCharacter(s) => s.to_string()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,19 +77,17 @@ impl DiagnosticLocation {
 pub struct Diagnostic {
     severity: Severity,
     kind: DiagnosticKind,
-    message : String,
     location: DiagnosticLocation,
     children: Vec<Diagnostic>
 }
 
 impl Diagnostic {
-    pub fn new(sev: Severity, diag_kind: DiagnosticKind, message_str: &str, loc: SourceLocation, span_end: usize, source_line: Option<&str>) -> Self {
+    pub fn new(sev: Severity, diag_kind: DiagnosticKind, loc: SourceLocation, span_end: usize, source_line: Option<&str>) -> Self {
         let children_vec: Vec<Diagnostic> = Vec::new();
         let diag_loc: DiagnosticLocation = DiagnosticLocation::new(&loc, span_end, source_line);
         Diagnostic {
             severity: sev,
             kind: diag_kind,
-            message: message_str.to_owned(),
             location: diag_loc,
             children: children_vec
         }
@@ -78,7 +113,7 @@ impl DiagnosticRenderer {
                 }
             }
             
-            let information_str: String = format!("{} {}: {}", source_location_str, severity_str, diagnostic.message);
+            let information_str: String = format!("{} {}: {}", source_location_str, severity_str, diagnostic.kind.message());
             eprintln!("{}", information_str);
 
             if let Some(ref source_line) = diagnostic.location.source_line {
@@ -104,8 +139,7 @@ pub struct DiagnosticEngine {
     pub diagnostics_vec: Vec<Diagnostic>,
     pub error_count: u64,
     pub warning_count: u64,
-    pub has_fatal: bool,
-    pub exit_code: i32
+    pub has_fatal: bool
 }
 
 impl DiagnosticEngine {
@@ -119,13 +153,12 @@ impl DiagnosticEngine {
             diagnostics_vec: diag_vec,
             error_count: err_count,
             warning_count: war_count,
-            has_fatal: fatal,
-            exit_code: 0
+            has_fatal: fatal
         }
     }
 
-    pub fn emit(&mut self, severity: Severity, kind: DiagnosticKind, message: &str, location: SourceLocation, span_end: usize, source_line: Option<&str>) -> bool {
-        let diagnostic: Diagnostic = Diagnostic::new(severity, kind, message, location, span_end, source_line);
+    pub fn emit(&mut self, severity: Severity, kind: DiagnosticKind, location: SourceLocation, span_end: usize, source_line: Option<&str>) -> bool {
+        let diagnostic: Diagnostic = Diagnostic::new(severity, kind, location, span_end, source_line);
         let cur_severity = diagnostic.severity.clone();
         self.diagnostics_vec.push(diagnostic);
 
