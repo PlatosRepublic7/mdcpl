@@ -53,7 +53,7 @@ impl Parser {
                 let last = self.token_vec.len() - 1;
                 let line = self.token_vec[last].location.line_num;
                 let col = self.token_vec[last].location.column_num;
-                self.create_parser_diagnostic(diagnostic_engine, ParserDiagnosticKind::UnexpectedEndOfInput, Severity::Error, "unexpected end of input".to_string(), line, col);
+                self.create_parser_diagnostic(diagnostic_engine, ParserDiagnosticKind::UnexpectedEndOfInput, Severity::Error, line, col);
                 return false;
             }
         };
@@ -62,15 +62,15 @@ impl Parser {
             self.advance();
             true
         } else {
-            self.create_parser_diagnostic(diagnostic_engine, ParserDiagnosticKind::UnexpectedToken, Severity::Error, "unexpected token".to_string(), current_line, current_col);
+            self.create_parser_diagnostic(diagnostic_engine, ParserDiagnosticKind::UnexpectedToken, Severity::Error,current_line, current_col);
             false
         }
     }
 
-    fn create_parser_diagnostic(&self, diag_engine: &mut DiagnosticEngine, parser_diag: ParserDiagnosticKind, severity: Severity, message: String, start_line: usize, start_col: usize) {
+    fn create_parser_diagnostic(&self, diag_engine: &mut DiagnosticEngine, parser_diag: ParserDiagnosticKind, severity: Severity, start_line: usize, start_col: usize) {
         let diag_kind: DiagnosticKind = DiagnosticKind::Parser(parser_diag);
         let source_location: SourceLocation = SourceLocation::new(&self.filename, start_line, start_col);
-        diag_engine.emit(severity, diag_kind, &message, source_location, 0, None);
+        diag_engine.emit(severity, diag_kind, source_location, 0, None);
     }
 }
 

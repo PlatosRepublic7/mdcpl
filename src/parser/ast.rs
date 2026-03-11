@@ -37,7 +37,7 @@ pub struct Parameter {
 // Statements
 pub enum Statement {
     Return(ReturnStatement),
-    Compund(CompoundStatement),
+    Compound(CompoundStatement),
     Expression(ExpressionStatement),
     If(Box<IfStatement>),
     While(WhileStatement),
