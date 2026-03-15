@@ -1,22 +1,27 @@
 use crate::source::SourceLocation;
 
+#[derive(Debug)]
 pub struct Program {
     pub declarations: Vec<Declaration>
 }
 
+#[derive(Debug)]
 pub enum Declaration {
-    FunctionDeclaration(FunctionDeclaration)
+    FunctionDeclaration(FunctionDeclaration),
+    Error
 }
 
+#[derive(Debug)]
 pub struct FunctionDeclaration {
-    name: String,
-    return_type: Type,
-    parameters: Vec<Parameter>,
-    body: CompoundStatement,
-    location: SourceLocation
+    pub name: String,
+    pub return_type: Type,
+    pub parameters: Vec<Parameter>,
+    pub body: CompoundStatement,
+    pub location: SourceLocation
 }
 
-enum Type {
+#[derive(Debug, PartialEq)]
+pub enum Type {
     Int,
     Char,
     Float,
@@ -28,13 +33,15 @@ enum Type {
     Pointer(Box<Type>)
 }
 
+#[derive(Debug)]
 pub struct Parameter {
-    name: String,
-    param_type: Type,
-    location: SourceLocation
+    pub name: String,
+    pub param_type: Type,
+    pub location: SourceLocation
 }
 
 // Statements
+#[derive(Debug)]
 pub enum Statement {
     Return(ReturnStatement),
     Compound(CompoundStatement),
@@ -44,21 +51,25 @@ pub enum Statement {
     Null
 }
 
+#[derive(Debug)]
 pub struct CompoundStatement {
-    statements: Vec<Statement>,
-    location: SourceLocation
+    pub statements: Vec<Statement>,
+    pub location: SourceLocation
 }
 
+#[derive(Debug)]
 pub struct ReturnStatement {
-    expression: Option<Expression>,
-    location: SourceLocation
+    pub expression: Option<Expression>,
+    pub location: SourceLocation
 }
 
+#[derive(Debug)]
 pub struct ExpressionStatement {
     expression: Expression,
     location: SourceLocation
 }
 
+#[derive(Debug)]
 pub struct IfStatement {
     condition: Expression,
     then_branch: Box<Statement>,
@@ -66,6 +77,7 @@ pub struct IfStatement {
     location: SourceLocation
 }
 
+#[derive(Debug)]
 pub struct WhileStatement {
     condition: Expression,
     body: Box<Statement>,
@@ -73,6 +85,7 @@ pub struct WhileStatement {
 }
 
 // Expressions
+#[derive(Debug)]
 pub enum Expression {
     IntegerLiteral(i64, SourceLocation),
     FloatLiteral(f64, SourceLocation),
@@ -85,6 +98,7 @@ pub enum Expression {
     Assignment(Box<AssignmentExpression>)
 }
 
+#[derive(Debug)]
 pub struct BinaryOpExpression {
     operator: BinaryOperator,
     left: Box<Expression>,
@@ -92,25 +106,28 @@ pub struct BinaryOpExpression {
     location: SourceLocation
 }
 
+#[derive(Debug)]
 pub struct UnaryOpExpression {
     operator: UnaryOperator,
     operand: Expression,
     location: SourceLocation
 }
 
-
+#[derive(Debug)]
 pub struct FunctionCallExpression {
     name: String,
     arguments: Vec<Expression>,
     location: SourceLocation
 }
 
+#[derive(Debug)]
 pub struct AssignmentExpression {
     target: String,
     value: Box<Expression>,
     location: SourceLocation
 }
 
+#[derive(Debug)]
 pub enum UnaryOperator {
     Negate,
     LogicalNot,
@@ -123,6 +140,7 @@ pub enum UnaryOperator {
     PostDecrement
 }
 
+#[derive(Debug)]
 pub enum BinaryOperator {
     Add, Subtract, Multiply, Divide, Modulus,
     Equal, NotEqual, LessThan, GreaterThan,

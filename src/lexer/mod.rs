@@ -50,7 +50,8 @@ impl Lexer {
             current_line = self.cur_line;
             current_col = self.cur_column;
         }
-        
+        // Add the Eof token
+        self.create_token(TokenKind::Eof, "".to_string(), current_line, current_col);
         self.token_vec
     }
 
@@ -95,9 +96,9 @@ impl Lexer {
         }
 
         if point_count == 1 {
-            token_kind = TokenKind::FloatingPoint;
+            token_kind = TokenKind::FloatingPointLiteral;
         } else {
-            token_kind = TokenKind::Integer;
+            token_kind = TokenKind::IntegerLiteral;
         }
 
         let mut severity: Severity = Severity::Fatal;
@@ -315,9 +316,11 @@ mod tests {
             let lexer = Lexer::new(String::from("int"), "test.c");
             let tokens = lexer.tokenize(&mut diag_engine);
 
-            assert_eq!(tokens.len(), 1);
+            assert_eq!(tokens.len(), 2);
             assert_eq!(tokens[0].kind, TokenKind::Int);
             assert_eq!(tokens[0].lexeme, "int");
+            assert_eq!(tokens[1].kind, TokenKind::Eof);
+            assert_eq!(tokens[1].lexeme, "");
         }
     }
 

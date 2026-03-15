@@ -23,14 +23,18 @@ impl DiagnosticKind {
 
 pub enum ParserDiagnosticKind {
     UnexpectedToken,
-    UnexpectedEndOfInput
+    UnexpectedEndOfInput,
+    InvalidTypeKeyword(String),
+    InvalidFunctionParameter(String)
 }
 
 impl ParserDiagnosticKind {
     pub fn message(&self) -> String {
         match self {
             ParserDiagnosticKind::UnexpectedToken => String::from("unexpected token"),
-            ParserDiagnosticKind::UnexpectedEndOfInput => String::from("unexpected end of input")
+            ParserDiagnosticKind::UnexpectedEndOfInput => String::from("unexpected end of input"),
+            ParserDiagnosticKind::InvalidTypeKeyword(s) => s.to_string(),
+            ParserDiagnosticKind::InvalidFunctionParameter(s) => s.to_string()
         }
     }
 }
