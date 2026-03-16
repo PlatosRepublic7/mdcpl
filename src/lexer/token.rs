@@ -69,6 +69,7 @@ pub enum TokenKind {
     Division,
     Modulus,
     Increment,
+    Decrement,
     Equal,              // ==
     NotEqual,
     Not,

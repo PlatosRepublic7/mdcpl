@@ -299,7 +299,25 @@ impl Lexer {
         punc_table.insert(":".to_owned(), TokenKind::Colon);
         punc_table.insert(",".to_owned(), TokenKind::Comma);
         punc_table.insert(".".to_owned(), TokenKind::Point);
-        
+        punc_table.insert("=".to_owned(), TokenKind::Assignment);
+        punc_table.insert("+".to_owned(), TokenKind::Addition);
+        punc_table.insert("-".to_owned(), TokenKind::Subtraction);
+        punc_table.insert("*".to_owned(), TokenKind::Multiplication);
+        punc_table.insert("/".to_owned(), TokenKind::Division);
+        punc_table.insert("%".to_owned(), TokenKind::Modulus);
+        punc_table.insert("!".to_owned(), TokenKind::Not);
+        punc_table.insert("^".to_owned(), TokenKind::BitXor);
+        punc_table.insert("&".to_owned(), TokenKind::BitAnd);
+        punc_table.insert("|".to_owned(), TokenKind::BitOr);
+        punc_table.insert("==".to_owned(), TokenKind::Equal);
+        punc_table.insert("!=".to_owned(), TokenKind::NotEqual);
+        punc_table.insert("+=".to_owned(), TokenKind::AddAssign);
+        punc_table.insert("-=".to_owned(), TokenKind::SubAssign);
+        punc_table.insert("*=".to_owned(), TokenKind::MultAssign);
+        punc_table.insert("/=".to_owned(), TokenKind::DivAssign);
+        punc_table.insert("++".to_owned(), TokenKind::Increment);
+        punc_table.insert("--".to_owned(), TokenKind::Decrement);
+
         punc_table
     }
 }
