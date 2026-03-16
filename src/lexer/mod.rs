@@ -50,7 +50,8 @@ impl Lexer {
             current_line = self.cur_line;
             current_col = self.cur_column;
         }
-        
+        // Add the Eof token
+        self.create_token(TokenKind::Eof, "".to_string(), current_line, current_col);
         self.token_vec
     }
 
@@ -62,9 +63,7 @@ impl Lexer {
         // and that there is only one present within the lexeme, otherwise we throw an error
         let mut point_count: u8 = 0;
         let mut found_error: bool = false;
-        let mut error_message = "";
         let mut found_warning: bool = false;
-        let mut warning_message = "";
         let token_kind: TokenKind;
         let mut lexer_diag: LexerDiagnosticKind = LexerDiagnosticKind::Null;
 
@@ -76,7 +75,6 @@ impl Lexer {
                 point_count += 1;
                 if point_count > 1 {
                     found_error = true;
-                    error_message = "multiple decimal points in floating point literal";
                     lexer_diag = LexerDiagnosticKind::MultipleDecimalPointsInFloat;
                     break;
                 }
@@ -84,8 +82,8 @@ impl Lexer {
                 self.advance();
             } else if c.is_alphabetic() {
                 found_error = true;
-                error_message = "invalid identifier";
-                lexer_diag = LexerDiagnosticKind::InvalidIdentifier;
+                let error_message = String::from("invalid identifier"); 
+                lexer_diag = LexerDiagnosticKind::InvalidIdentifier(error_message);
                 break;
             } else {
                 break;
@@ -94,29 +92,26 @@ impl Lexer {
 
         if let Some(c) = lexeme.chars().last() && c == '.' {
             found_warning = true;
-            warning_message = "trailing decimal point found in float literal, consider adding a trailing '0'";
             lexer_diag = LexerDiagnosticKind::TrailingDecimalPointInFloat;
         }
 
         if point_count == 1 {
-            token_kind = TokenKind::FloatingPoint;
+            token_kind = TokenKind::FloatingPointLiteral;
         } else {
-            token_kind = TokenKind::Integer;
+            token_kind = TokenKind::IntegerLiteral;
         }
 
         let mut severity: Severity = Severity::Fatal;
         let mut diag_message: String = String::new();
         if found_error {
             severity = Severity::Error;
-            diag_message = String::from(error_message);
         }
         if found_warning {
             severity = Severity::Warning;
-            diag_message = String::from(warning_message);
         }
 
         if found_error || found_warning {
-            self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, diag_message, start_line, start_col);
+            self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
         }
 
         self.create_token(token_kind, lexeme, start_line, start_col);
@@ -146,10 +141,10 @@ impl Lexer {
             None => {
                 // Unknown token, create a lexical diagnostic 
                 token_kind = TokenKind::Unknown;
-                let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidCharacter;
                 let severity: Severity = Severity::Error;
                 let err_message = format!("invalid character: {}", lexeme);
-                self.create_lexer_diagnostic(diag_engine, lexer_error, severity, err_message, start_line, start_col);
+                let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidCharacter(err_message);
+                self.create_lexer_diagnostic(diag_engine, lexer_error, severity, start_line, start_col);
             }
         }
 
@@ -166,10 +161,10 @@ impl Lexer {
             } else if c == '\n' || c.is_whitespace() || c.is_ascii_punctuation() {
                 break;
             } else {
-                let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidIdentifier;
                 let severity: Severity = Severity::Error;
                 let err_message = format!("invalid identifier: {}", lexeme);
-                self.create_lexer_diagnostic(diag_engine, lexer_error, severity, err_message, start_line, start_col);
+                let lexer_error: LexerDiagnosticKind = LexerDiagnosticKind::InvalidIdentifier(err_message);
+                self.create_lexer_diagnostic(diag_engine, lexer_error, severity, start_line, start_col);
             }
         }
 
@@ -216,12 +211,12 @@ impl Lexer {
         self.token_vec.push(token);
     }
 
-    fn create_lexer_diagnostic(&self, diag_engine: &mut DiagnosticEngine, lexer_diag: LexerDiagnosticKind, severity: Severity, message: String, start_line: usize, start_col: usize) -> bool {
+    fn create_lexer_diagnostic(&self, diag_engine: &mut DiagnosticEngine, lexer_diag: LexerDiagnosticKind, severity: Severity, start_line: usize, start_col: usize) -> bool {
         let diag_kind: DiagnosticKind = DiagnosticKind::Lexer(lexer_diag);
         let source_location: SourceLocation = SourceLocation::new(&self.filename, start_line, start_col);
         let span_end = self.cur_column - start_col;
         let source_line = self.current_line_text();
-        diag_engine.emit(severity, diag_kind, &message, source_location, span_end, Some(source_line.as_str()))
+        diag_engine.emit(severity, diag_kind, source_location, span_end, Some(source_line.as_str()))
     }
 
     fn current_line_text(&self) -> String {
@@ -304,7 +299,25 @@ impl Lexer {
         punc_table.insert(":".to_owned(), TokenKind::Colon);
         punc_table.insert(",".to_owned(), TokenKind::Comma);
         punc_table.insert(".".to_owned(), TokenKind::Point);
-        
+        punc_table.insert("=".to_owned(), TokenKind::Assignment);
+        punc_table.insert("+".to_owned(), TokenKind::Addition);
+        punc_table.insert("-".to_owned(), TokenKind::Subtraction);
+        punc_table.insert("*".to_owned(), TokenKind::Multiplication);
+        punc_table.insert("/".to_owned(), TokenKind::Division);
+        punc_table.insert("%".to_owned(), TokenKind::Modulus);
+        punc_table.insert("!".to_owned(), TokenKind::Not);
+        punc_table.insert("^".to_owned(), TokenKind::BitXor);
+        punc_table.insert("&".to_owned(), TokenKind::BitAnd);
+        punc_table.insert("|".to_owned(), TokenKind::BitOr);
+        punc_table.insert("==".to_owned(), TokenKind::Equal);
+        punc_table.insert("!=".to_owned(), TokenKind::NotEqual);
+        punc_table.insert("+=".to_owned(), TokenKind::AddAssign);
+        punc_table.insert("-=".to_owned(), TokenKind::SubAssign);
+        punc_table.insert("*=".to_owned(), TokenKind::MultAssign);
+        punc_table.insert("/=".to_owned(), TokenKind::DivAssign);
+        punc_table.insert("++".to_owned(), TokenKind::Increment);
+        punc_table.insert("--".to_owned(), TokenKind::Decrement);
+
         punc_table
     }
 }
@@ -321,9 +334,11 @@ mod tests {
             let lexer = Lexer::new(String::from("int"), "test.c");
             let tokens = lexer.tokenize(&mut diag_engine);
 
-            assert_eq!(tokens.len(), 1);
+            assert_eq!(tokens.len(), 2);
             assert_eq!(tokens[0].kind, TokenKind::Int);
             assert_eq!(tokens[0].lexeme, "int");
+            assert_eq!(tokens[1].kind, TokenKind::Eof);
+            assert_eq!(tokens[1].lexeme, "");
         }
     }
 

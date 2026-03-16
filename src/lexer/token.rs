@@ -6,8 +6,8 @@ pub enum TokenKind {
     Identifier,
 
     // Numeric
-    Integer,
-    FloatingPoint,
+    IntegerLiteral,
+    FloatingPointLiteral,
 
     // Keywords
     Char,
@@ -68,8 +68,8 @@ pub enum TokenKind {
     Multiplication,
     Division,
     Modulus,
-    PrefixIncrement,
-    PostfixIncrement,
+    Increment,
+    Decrement,
     Equal,              // ==
     NotEqual,
     Not,
@@ -85,7 +85,7 @@ pub enum TokenKind {
     Eof
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: String,

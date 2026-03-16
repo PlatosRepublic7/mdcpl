@@ -2,6 +2,8 @@ mod arg_driver;
 use arg_driver::{ArgDriver, CompilerOptions, CompilerStage, OptimizationLevel};
 use crate::lexer::Lexer;
 use crate::lexer::token::Token;
+use crate::parser::Parser;
+use crate::parser::ast::{Program};
 use crate::diagnostics::DiagnosticEngine;
 use std::io;
 use std::fs;
@@ -42,16 +44,19 @@ impl Driver {
            
             // Create token_vec so that it won't be out of scope when needed for parsing stage
             let mut token_vec: Vec<Token> = Vec::new();
+            let mut program: Program;
 
             // Tokenize
-            if self.compiler_options.stop_stage == CompilerStage::Lex {
+            if self.compiler_options.stop_stage == CompilerStage::Lex || self.compiler_options.stop_stage == CompilerStage::Parse {
                 let source_text = fs::read_to_string(&self.preprocessor_file)?;
                 let lexer: Lexer = Lexer::new(source_text, &self.preprocessor_file);
                 token_vec = lexer.tokenize(diag_engine);
             }
 
             if self.compiler_options.stop_stage == CompilerStage::Parse {
-                todo!();
+                let mut parser: Parser = Parser::new(token_vec, &self.preprocessor_file);
+                program = parser.parse(diag_engine);
+                dbg!(&program);
             }
         
             if self.compiler_options.stop_stage == CompilerStage::Assemble {
