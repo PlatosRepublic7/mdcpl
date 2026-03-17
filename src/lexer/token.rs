@@ -8,6 +8,9 @@ pub enum TokenKind {
     // Numeric
     IntegerLiteral,
     FloatingPointLiteral,
+    HexidecimalLiteral,
+    OctalLiteral,
+    BinaryLiteral,
 
     // Keywords
     Char,
