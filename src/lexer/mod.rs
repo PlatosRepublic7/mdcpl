@@ -57,61 +57,117 @@ impl Lexer {
 
     fn numeric_scanner(&mut self, start_line: usize, start_col: usize, diag_engine: &mut DiagnosticEngine) {
         let mut lexeme = String::new();
-
-        // We can keep track of whether of not a decimal point appears in the lexeme
-        // If it does, we can make sure that it isn't the last character in the lexeme,
-        // and that there is only one present within the lexeme, otherwise we throw an error
         let mut point_count: u8 = 0;
-        let mut found_error: bool = false;
-        let mut found_warning: bool = false;
-        let token_kind: TokenKind;
-        let mut lexer_diag: LexerDiagnosticKind = LexerDiagnosticKind::Null;
-
-        while let Some(c) = self.peek() {
-            if c.is_numeric() {
-                lexeme += &c.to_string();
-                self.advance();
-            } else if c == '.' {
-                point_count += 1;
-                if point_count > 1 {
-                    found_error = true;
-                    lexer_diag = LexerDiagnosticKind::MultipleDecimalPointsInFloat;
-                    break;
-                }
-                lexeme += &c.to_string();
-                self.advance();
-            } else if c.is_alphabetic() {
-                found_error = true;
-                let error_message = String::from("invalid identifier"); 
-                lexer_diag = LexerDiagnosticKind::InvalidIdentifier(error_message);
-                break;
-            } else {
-                break;
+        let mut token_kind: TokenKind = TokenKind::IntegerLiteral; 
+        let mut numeric_type: NumericType = NumericType::IntegerOrFloat;
+        
+        // Determine what kind of numeric parsing we need to do
+        if let Some(c) = self.peek() {
+            if c == '0' && (self.peek_next() == Some('x') || self.peek_next() == Some('X')) {
+                // Hex literal
+                numeric_type = NumericType::Hexidecimal;
+                token_kind = TokenKind::HexidecimalLiteral;
+            } else if c == '0' && (self.peek_next() == Some('b') || self.peek_next() == Some('B')) {
+                // Binary literal
+                numeric_type = NumericType::Binary;
+                token_kind = TokenKind::BinaryLiteral;
+            } else if c == '0' && self.peek_next().map(|next| next.is_numeric()).unwrap_or(false) {
+                numeric_type = NumericType::Octal;
+                token_kind = TokenKind::OctalLiteral;
             }
         }
-
-        if let Some(c) = lexeme.chars().last() && c == '.' {
-            found_warning = true;
-            lexer_diag = LexerDiagnosticKind::TrailingDecimalPointInFloat;
-        }
-
-        if point_count == 1 {
-            token_kind = TokenKind::FloatingPointLiteral;
-        } else {
-            token_kind = TokenKind::IntegerLiteral;
-        }
-
-        let mut severity: Severity = Severity::Fatal;
-        let mut diag_message: String = String::new();
-        if found_error {
-            severity = Severity::Error;
-        }
-        if found_warning {
-            severity = Severity::Warning;
-        }
-
-        if found_error || found_warning {
-            self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+        // IntegerOrFloat is default
+        
+        // Now we match on the NumericType
+        match numeric_type {
+            NumericType::Hexidecimal => {
+                lexeme += &self.peek().unwrap().to_string();
+                self.advance();
+                lexeme += &self.peek().unwrap().to_string();
+                self.advance();
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_hexdigit() {
+                        lexeme += &c.to_string();
+                        self.advance();
+                    } else if c.is_whitespace() || self.punctuation_table.contains_key(&c.to_string()) {
+                        break;
+                    } else {
+                        let error_message = String::from("invalid hexidecimal literal");
+                        let lexer_diag = LexerDiagnosticKind::InvalidHexLiteral(error_message);
+                        let severity = Severity::Error;
+                        self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+                        break;
+                    }
+                }
+            }
+            NumericType::Binary => {
+                lexeme += &self.peek().unwrap().to_string();
+                self.advance();
+                lexeme += &self.peek().unwrap().to_string();
+                self.advance();
+                while let Some(c) = self.peek() {
+                    if c == '0' || c == '1' {
+                        lexeme += &c.to_string();
+                        self.advance();
+                    } else if c.is_whitespace() || self.punctuation_table.contains_key(&c.to_string()) {
+                        break;
+                    } else {
+                        let error_message = String::from("invalid binary literal");
+                        let lexer_diag = LexerDiagnosticKind::InvalidBinaryLiteral(error_message);
+                        let severity = Severity::Error;
+                        self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+                        break;
+                    }
+                }
+            }
+            NumericType::Octal => {
+                lexeme += &self.peek().unwrap().to_string();
+                self.advance();
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_digit() && c != '8' && c != '9' {
+                        lexeme += &c.to_string();
+                        self.advance();
+                    } else if c.is_whitespace() || self.punctuation_table.contains_key(&c.to_string()) {
+                        break;
+                    } else {
+                        let error_message = String::from("invalid octal literal");
+                        let lexer_diag = LexerDiagnosticKind::InvalidOctalLiteral(error_message);
+                        let severity = Severity::Error;
+                        self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+                        break;
+                    }
+                }
+            }
+            NumericType::IntegerOrFloat => {
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_digit() || (c == '.' && point_count < 1) {
+                        lexeme += &c.to_string();
+                        if c == '.' {
+                            point_count += 1;
+                            token_kind = TokenKind::FloatingPointLiteral;
+                        }
+                        self.advance();
+                    } else if c == '.' && point_count == 1 {
+                        let lexer_diag = LexerDiagnosticKind::MultipleDecimalPointsInFloat;
+                        let severity = Severity::Error;
+                        self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+                        break;
+                    } else if c.is_whitespace() || self.punctuation_table.contains_key(&c.to_string()) {
+                        break;
+                    } else {
+                        let error_message = String::from("invalid numeric literal");                        
+                        let lexer_diag = LexerDiagnosticKind::InvalidNumericLiteral(error_message);
+                        let severity = Severity::Error;
+                        self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+                        break;
+                    }
+                }
+                if lexeme.ends_with(".") {
+                    let lexer_diag = LexerDiagnosticKind::TrailingDecimalPointInFloat;
+                    let severity = Severity::Warning;
+                    self.create_lexer_diagnostic(diag_engine, lexer_diag, severity, start_line, start_col);
+                }
+            }
         }
 
         self.create_token(token_kind, lexeme, start_line, start_col);
@@ -322,6 +378,14 @@ impl Lexer {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum NumericType {
+    Hexidecimal,
+    Binary,
+    Octal,
+    IntegerOrFloat
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,16 +409,115 @@ mod tests {
     mod numeric_tests {
         use super::*;
         #[test]
-        fn test_multiple_decimal_points() {
+        fn test_valid_integer_literal() {
             let mut diag_engine = DiagnosticEngine::new();
-            let lexer = Lexer::new(String::from("1.2.3"), "test.c");
+            let lexer = Lexer::new(String::from("42"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+            
+            assert_eq!(tokens.len(), 2);
+            assert_eq!(tokens[0].kind, TokenKind::IntegerLiteral);
+            assert_eq!(tokens[0].lexeme, "42");
+        }
+
+        #[test]
+        fn test_valid_float_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("3.14"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+            
+            assert_eq!(tokens.len(), 2);
+            assert_eq!(tokens[0].kind, TokenKind::FloatingPointLiteral);
+            assert_eq!(tokens[0].lexeme, "3.14");
+        }
+
+        #[test]
+        fn test_valid_hex_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("0xFF"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+            
+            assert_eq!(tokens.len(), 2);
+            assert_eq!(tokens[0].kind, TokenKind::HexidecimalLiteral);
+            assert_eq!(tokens[0].lexeme, "0xFF");
+        }
+
+        #[test]
+        fn test_valid_octal_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("0755"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+            
+            assert_eq!(tokens.len(), 2);
+            assert_eq!(tokens[0].kind, TokenKind::OctalLiteral);
+            assert_eq!(tokens[0].lexeme, "0755");
+        }
+
+        #[test]
+        fn test_valid_binary_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("0b1010"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+            
+            assert_eq!(tokens.len(), 2);
+            assert_eq!(tokens[0].kind, TokenKind::BinaryLiteral);
+            assert_eq!(tokens[0].lexeme, "0b1010");
+        }
+
+        #[test]
+        fn test_invalid_float_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let mut lexer = Lexer::new(String::from("1.2.3"), "test.c");
+            let mut tokens = lexer.tokenize(&mut diag_engine);
+
+            assert_eq!(diag_engine.error_count, 1);
+            assert_eq!(diag_engine.diagnostics_vec.len(), 1);
+            assert_eq!(diag_engine.diagnostics_vec[0].kind, DiagnosticKind::Lexer(LexerDiagnosticKind::MultipleDecimalPointsInFloat));
+            assert_eq!(diag_engine.diagnostics_vec[0].severity, Severity::Error);
+
+            diag_engine = DiagnosticEngine::new();
+            lexer = Lexer::new(String::from("1."), "test2.c");
+            tokens = lexer.tokenize(&mut diag_engine);
+            
+            assert_eq!(diag_engine.warning_count, 1);
+            assert_eq!(diag_engine.diagnostics_vec.len(), 1);
+            assert_eq!(diag_engine.diagnostics_vec[0].kind, DiagnosticKind::Lexer(LexerDiagnosticKind::TrailingDecimalPointInFloat));
+            assert_eq!(diag_engine.diagnostics_vec[0].severity, Severity::Warning);
+        }
+
+        #[test]
+        fn test_invalid_hex_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("0xGG"), "test.c");
             let tokens = lexer.tokenize(&mut diag_engine);
 
             assert_eq!(diag_engine.error_count, 1);
+            assert_eq!(diag_engine.diagnostics_vec.len(), 1);
+            assert_eq!(diag_engine.diagnostics_vec[0].kind, DiagnosticKind::Lexer(LexerDiagnosticKind::InvalidHexLiteral("invalid hexidecimal literal".to_string())));
+            assert_eq!(diag_engine.diagnostics_vec[0].severity, Severity::Error);
+        }
 
-            for token in tokens {
-                println!("{:#?}", token);
-            }
+        #[test]
+        fn test_invalid_binary_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("0b2"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+
+            assert_eq!(diag_engine.error_count, 1);
+            assert_eq!(diag_engine.diagnostics_vec.len(), 1);
+            assert_eq!(diag_engine.diagnostics_vec[0].kind, DiagnosticKind::Lexer(LexerDiagnosticKind::InvalidBinaryLiteral("invalid binary literal".to_string())));
+            assert_eq!(diag_engine.diagnostics_vec[0].severity, Severity::Error);
+        }
+
+        #[test]
+        fn test_invalid_octal_literal() {
+            let mut diag_engine = DiagnosticEngine::new();
+            let lexer = Lexer::new(String::from("0789"), "test.c");
+            let tokens = lexer.tokenize(&mut diag_engine);
+
+            assert_eq!(diag_engine.error_count, 1);
+            assert_eq!(diag_engine.diagnostics_vec.len(), 1);
+            assert_eq!(diag_engine.diagnostics_vec[0].kind, DiagnosticKind::Lexer(LexerDiagnosticKind::InvalidOctalLiteral("invalid octal literal".to_string())));
+            assert_eq!(diag_engine.diagnostics_vec[0].severity, Severity::Error);
         }
     }
 

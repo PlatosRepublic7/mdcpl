@@ -7,6 +7,7 @@ pub enum Severity {
     Warning
 }
 
+#[derive(Debug, PartialEq)]
 pub enum DiagnosticKind {
     Lexer(LexerDiagnosticKind),
     Parser(ParserDiagnosticKind)
@@ -21,6 +22,7 @@ impl DiagnosticKind {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ParserDiagnosticKind {
     UnexpectedToken,
     UnexpectedEndOfInput,
@@ -39,12 +41,17 @@ impl ParserDiagnosticKind {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum LexerDiagnosticKind {
     UnterminatedStringLiteral,
     InvalidIdentifier(String),
     MultipleDecimalPointsInFloat,
     TrailingDecimalPointInFloat,
+    InvalidNumericLiteral(String),
     InvalidCharacter(String),
+    InvalidHexLiteral(String),
+    InvalidBinaryLiteral(String),
+    InvalidOctalLiteral(String),
     Null
 }
 
@@ -56,7 +63,11 @@ impl LexerDiagnosticKind {
             LexerDiagnosticKind::InvalidIdentifier(s) => s.to_string(),
             LexerDiagnosticKind::MultipleDecimalPointsInFloat => String::from("multiple decimal points in float literal"),
             LexerDiagnosticKind::TrailingDecimalPointInFloat => String::from("trailing decimal point in float literal"),
-            LexerDiagnosticKind::InvalidCharacter(s) => s.to_string()
+            LexerDiagnosticKind::InvalidNumericLiteral(s) => s.to_string(),
+            LexerDiagnosticKind::InvalidCharacter(s) => s.to_string(),
+            LexerDiagnosticKind::InvalidHexLiteral(s) => s.to_string(),
+            LexerDiagnosticKind::InvalidBinaryLiteral(s) => s.to_string(),
+            LexerDiagnosticKind::InvalidOctalLiteral(s) => s.to_string()
         }
     }
 }
@@ -78,10 +89,11 @@ impl DiagnosticLocation {
     }
 }
 
+#[derive(Debug)]
 pub struct Diagnostic {
-    severity: Severity,
-    kind: DiagnosticKind,
-    location: DiagnosticLocation,
+    pub severity: Severity,
+    pub kind: DiagnosticKind,
+    pub location: DiagnosticLocation,
     children: Vec<Diagnostic>
 }
 
